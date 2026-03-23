@@ -8,6 +8,37 @@
     <div v-if="loading" class="loading">{{ t('common.loading') }}</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <div v-else>
+      <!-- Submitted restocking orders from the Restocking page -->
+      <div v-if="restockingOrders.length > 0" class="card restocking-orders-section">
+        <div class="card-header">
+          <h3 class="card-title">{{ t('restocking.submittedOrders') }}</h3>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>{{ t('restocking.ordersTable.orderNumber') }}</th>
+                <th>{{ t('restocking.ordersTable.items') }}</th>
+                <th>{{ t('restocking.ordersTable.totalValue') }}</th>
+                <th>{{ t('restocking.ordersTable.submitted') }}</th>
+                <th>{{ t('restocking.ordersTable.expectedDelivery') }}</th>
+                <th>{{ t('restocking.ordersTable.status') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="order in restockingOrders" :key="order.id">
+                <td><strong>{{ order.order_number }}</strong></td>
+                <td>{{ order.items.length }} {{ t('common.items') }}</td>
+                <td><strong>{{ formatCurrency(order.total_value) }}</strong></td>
+                <td>{{ formatDate(order.submitted_date) }}</td>
+                <td>{{ formatDate(order.expected_delivery) }}</td>
+                <td><span class="badge info">{{ order.status }}</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="stats-grid">
         <div class="stat-card success">
           <div class="stat-label">{{ t('status.delivered') }}</div>
@@ -95,6 +126,7 @@ export default {
     const loading = ref(true)
     const error = ref(null)
     const orders = ref([])
+    const restockingOrders = ref([])
 
     // Use shared filters
     const {
@@ -143,6 +175,18 @@ export default {
       return statusMap[status] || 'info'
     }
 
+    const formatCurrency = (value) =>
+      value.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+
+    const loadRestockingOrders = async () => {
+      try {
+        restockingOrders.value = await api.getRestockingOrders()
+      } catch {
+        // Restocking orders are supplemental; silently skip on failure
+        restockingOrders.value = []
+      }
+    }
+
     const formatDate = (dateString) => {
       const { currentLocale } = useI18n()
       const locale = currentLocale.value === 'ja' ? 'ja-JP' : 'en-US'
@@ -153,16 +197,18 @@ export default {
       })
     }
 
-    onMounted(loadOrders)
+    onMounted(() => Promise.all([loadOrders(), loadRestockingOrders()]))
 
     return {
       t,
       loading,
       error,
       orders,
+      restockingOrders,
       getOrdersByStatus,
       getOrderStatusClass,
       formatDate,
+      formatCurrency,
       currencySymbol,
       translateProductName,
       translateCustomerName
@@ -172,6 +218,10 @@ export default {
 </script>
 
 <style scoped>
+.restocking-orders-section {
+  margin-bottom: 1.5rem;
+}
+
 /* Fixed table layout to prevent column shifting */
 .orders-table {
   table-layout: fixed;
